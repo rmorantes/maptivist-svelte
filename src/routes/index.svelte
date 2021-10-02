@@ -2,58 +2,108 @@
 	export const prerender = true;
 </script>
 
-<script lang="ts">
-	import Counter from '$lib/Counter.svelte';
-</script>
+<div id="map" style="height: 500px"></div>
 
 <svelte:head>
 	<title>Home</title>
 </svelte:head>
 
-<section>
-	<h1>
-		<div class="welcome">
-			<picture>
-				<source srcset="svelte-welcome.webp" type="image/webp" />
-				<img src="svelte-welcome.png" alt="Welcome" />
-			</picture>
-		</div>
-
-		to your new<br />SvelteKit app
-	</h1>
-
-	<h2>
-		try editing <strong>src/routes/index.svelte</strong>
-	</h2>
-
-	<Counter />
-</section>
-
-<style>
-	section {
-		display: flex;
-		flex-direction: column;
-		justify-content: center;
-		align-items: center;
-		flex: 1;
+<script lang="ts">
+	import maplibregl from "maplibre-gl";
+	import { onMount } from 'svelte';
+	import 'maplibre-gl/dist/maplibre-gl.css';
+	
+	const mapOptions = {
+		center: [-122.483696, 37.833818],
+		container: 'map',
+		style: 'https://api.maptiler.com/maps/streets/style.json?key=get_your_own_OpIi9ZULNHzrESv6T2vL',
+		zoom: 14
 	}
 
-	h1 {
-		width: 100%;
+	const data = {
+		'type': 'Feature',
+		'properties': {},
+		'geometry': {
+			'type': 'LineString',
+			'coordinates': [
+				// Example trail
+				[-122.483696, 37.833818],
+				[-122.483482, 37.833174],
+				[-122.483396, 37.8327],
+				[-122.483568, 37.832056],
+				[-122.48404, 37.831141],
+				[-122.48404, 37.830497],
+				[-122.483482, 37.82992],
+				[-122.483568, 37.829548],
+				[-122.48507, 37.829446],
+			]
+		}
 	}
 
-	.welcome {
-		position: relative;
-		width: 100%;
-		height: 0;
-		padding: 0 0 calc(100% * 495 / 2048) 0;
+	const source = {
+		'data': data,
+		'lineMetrics': true,
+		'type': 'geojson',
+		'tolerance': 0.00001,
 	}
 
-	.welcome img {
-		position: absolute;
-		width: 100%;
-		height: 100%;
-		top: 0;
-		display: block;
+	const layer = {
+		'id': 'route',
+		'type': 'line',
+		'source': 'route',
+		'layout': {
+			'line-join': 'round',
+			'line-cap': 'round'
+		},
+		'paint': {
+			'line-color': '#888',
+			'line-width': 8,
+			'line-blur': 2,
+			'line-gradient': [
+				'interpolate',
+				['linear'],
+				['line-progress'],
+				0,
+				'#0298ff',
+				1,
+				'transparent'
+			]
+		}
 	}
-</style>
+
+	onMount(async () => {
+		var map = new maplibregl.Map(mapOptions);
+		console.log('1')
+		map.on('load', () => {
+			console.log('2')
+			map.addSource('route', source);
+			map.addLayer(layer);
+			const trailPoints = [];
+
+			const updateTrail = () => {
+				console.log("3")
+				navigator.geolocation.getCurrentPosition((position) => {
+					console.log('position coords = ', position.coords)
+					
+					trailPoints.push([position.coords.longitude, position.coords.latitude]);
+					if (trailPoints.length > 10) {
+						trailPoints.shift();
+					}
+
+					map.getSource('route').setData({
+						'type': 'Feature',
+						'properties': {},
+						'geometry': {
+							'type': 'LineString',
+							'coordinates': trailPoints
+						}
+					});
+
+					map.flyTo({center: [position.coords.longitude, position.coords.latitude]})
+				}) 
+			};
+
+			setInterval(() => updateTrail(), 5000);
+		})
+	});
+</script>
